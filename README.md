@@ -20,7 +20,7 @@ Görev Zamanlayıcısı (Task Scheduler) ile çalıştırılabilir: ek dosya des
 ## Kurulum
 
 ```bash
-git clone https://github.com/BlackSwany/raindrop-sender.git
+git clone https://github.com/Atamations/raindrop-sender.git
 cd raindrop-sender
 python -m venv .venv
 .venv\Scripts\activate
