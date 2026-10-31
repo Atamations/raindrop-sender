@@ -1,23 +1,28 @@
-# Raindrop Sender
+# Raindrop Mail Sender
 
-**Atamation** — Gmail SMTP ile tek seferlik e-posta gönderici.
+**Atamation** — Gmail SMTP mail gönderici · **v2.0**
 
-Görev Zamanlayıcısı (Task Scheduler) ile çalıştırılabilir: ek dosya desteği, çoklu alıcı ve her çalıştırmada durum raporu maili.
+Çerçevesiz masaüstü UI (pywebview) + Task Scheduler seviyesinde zamanlama + tek seferlik CLI.
 
-## Özellikler
+## v2.0 Öne çıkanlar
 
-- `.env` üzerinden yapılandırma (şifreler kodda tutulmaz)
-- Birden fazla alıcıya ayrı mail
-- İsteğe bağlı dosya eki
-- `REPORT_EMAIL` adresine başarı / hata özeti
-- Konsol + `mailer.log` kaydı
+- Liquid Glass-inspired masaüstü arayüz (çerçevesiz pencere)
+- Hesap / Zamanlama / Aktivite sekmeleri
+- Edit Trigger tarzı zamanlama (bir kez, günlük, haftalık, aylık + gelişmiş tekrar/bitiş)
+- Çoklu alıcı, ek dosya, yalnızca hata durumunda `REPORT_EMAIL` bildirimi
+- `RaindropMailSender.exe` paketi (PyInstaller)
 
-## Gereksinimler
+## Hızlı başlangıç (exe)
 
-- Python 3.10+
-- Gmail hesabı + [Google App Password](https://myaccount.google.com/apppasswords)
+1. [Releases](https://github.com/Atamations/raindrop-sender/releases) sayfasından **v2.0** paketini indirin
+2. Klasörde `.env.example` → `.env` kopyalayın ve doldurun
+3. `RaindropMailSender.exe` çalıştırın  
+   veya masaüstü kısayolunu kullanın
 
-## Kurulum
+Otomatik gönderim: UI → **Zamanlama** → ayarla → **Ayarları kaydet**  
+(PC açıkken çalışır; Windows görevini uygulama kurar.)
+
+## Geliştirici kurulumu
 
 ```bash
 git clone https://github.com/Atamations/raindrop-sender.git
@@ -25,51 +30,42 @@ cd raindrop-sender
 python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
-```
-
-## Credential’ları nereye yazmalısınız?
-
-1. Şablonu kopyalayın:
-
-```bash
 copy .env.example .env
+python ui_app.py
 ```
 
-2. `.env` dosyasını düzenleyin:
-
-| Değişken | Ne yazmalısınız |
-|----------|-----------------|
-| `GMAIL_ADDRESS` | Gönderen Gmail adresiniz |
-| `GMAIL_APP_PASSWORD` | Google Uygulama Şifresi (16 hane; normal şifre değil) |
-| `RECIPIENT_EMAIL` | Alıcı(lar), virgülle ayırın |
-| `REPORT_EMAIL` | Durum raporunun geleceği sizin mailiniz |
-| `SMTP_HOST` / `SMTP_PORT` | Varsayılan Gmail: `smtp.gmail.com` / `587` |
-| `EMAIL_SUBJECT` / `EMAIL_BODY` | Mail konusu ve gövdesi |
-| `ATTACHMENT_PATH` | İsteğe bağlı ek dosya yolu(ları); boş bırakılabilir |
-
-3. Çalıştırın:
+CLI / Task Scheduler:
 
 ```bash
 python main.py
-```
-
-veya Windows’ta:
-
-```bash
+# veya
+python ui_app.py --send
+# veya
 run_mailer.bat
 ```
 
+Exe derleme:
+
+```bash
+build_exe.bat
+```
+
+## `.env` alanları
+
+| Değişken | Açıklama |
+|----------|----------|
+| `GMAIL_ADDRESS` | Gönderen Gmail |
+| `GMAIL_APP_PASSWORD` | Google Uygulama Şifresi |
+| `RECIPIENT_EMAIL` | Alıcı(lar), virgülle |
+| `REPORT_EMAIL` | Yalnızca hata raporu adresi |
+| `EMAIL_SUBJECT` / `EMAIL_BODY` | Konu / gövde |
+| `ATTACHMENT_PATH` | Ekler (`;` ile ayır) |
+| `SMTP_HOST` / `SMTP_PORT` | Varsayılan Gmail `587` |
+
 ## Güvenlik
 
-- Gerçek `.env` dosyası Git’e **dahil edilmez**.
-- App Password’ü kimseyle paylaşmayın; sızdıysa Google hesabından iptal edip yenisini alın.
-- Bu repo yalnızca şablon (`.env.example`) içerir; kişisel mail/şifre bulunmaz.
-
-## Windows Görev Zamanlayıcısı
-
-1. Görev Zamanlayıcısı → Temel Görev Oluştur
-2. Tetikleyici: istediğiniz saat / günlük
-3. Eylem: `run_mailer.bat` veya `python main.py` (çalışma dizini proje klasörü olsun)
+- `.env` Git’e girmez
+- App Password paylaşmayın
 
 ## Lisans
 

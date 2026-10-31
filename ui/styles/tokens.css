@@ -1,0 +1,73 @@
+/* Raindrop Mail Sender — Liquid Glass inspired tokens (Windows interpretation) */
+
+:root {
+  /* Canvas — quiet atmospheric field */
+  --color-canvas-deep: #0b1220;
+  --color-canvas-mid: #152238;
+  --color-canvas-glow: #2a4a6e;
+  --color-accent-mist: rgba(140, 190, 230, 0.45);
+  --color-accent: #7eb8e8;
+  --color-accent-strong: #5a9fd4;
+
+  /* Glass surfaces — selective chrome only */
+  --glass-bg: rgba(255, 255, 255, 0.08);
+  --glass-bg-strong: rgba(255, 255, 255, 0.12);
+  --glass-border: rgba(255, 255, 255, 0.22);
+  --glass-highlight: rgba(255, 255, 255, 0.35);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.28);
+  --glass-blur: 24px;
+
+  /* Text */
+  --color-text-primary: #f4f7fb;
+  --color-text-secondary: rgba(220, 230, 240, 0.72);
+  --color-text-muted: rgba(200, 214, 230, 0.5);
+  --color-danger: #f07178;
+  --color-success: #7dcea0;
+  --color-focus: rgba(126, 184, 232, 0.85);
+
+  /* Compose (content, not glass) */
+  --compose-bg: rgba(8, 14, 26, 0.55);
+  --compose-border: rgba(255, 255, 255, 0.1);
+  --field-bg: rgba(0, 0, 0, 0.28);
+  --field-border: rgba(255, 255, 255, 0.12);
+
+  /* Spacing / radius / type / motion */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-pill: 999px;
+
+  --font-sans: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-md: 15px;
+  --text-lg: 18px;
+  --text-xl: 26px;
+
+  --motion-fast: 160ms;
+  --motion-med: 220ms;
+  --motion-slow: 280ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+
+  --chrome-h: 64px;
+  --action-h: 72px;
+  --side-w: 400px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-fast: 1ms;
+    --motion-med: 1ms;
+    --motion-slow: 1ms;
+  }
+}

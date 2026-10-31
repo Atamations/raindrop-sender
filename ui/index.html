@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Raindrop Mail Sender</title>
+    <link rel="stylesheet" href="styles/tokens.css" />
+    <link rel="stylesheet" href="styles/shell.css" />
+  </head>
+  <body>
+    <div class="app" id="app">
+      <div class="titlebar" role="banner">
+        <div class="titlebar-drag">
+          <span class="titlebar-title">Raindrop Mail Sender</span>
+        </div>
+        <div class="titlebar-controls">
+          <button type="button" class="win-btn" id="btnMin" aria-label="Küçült" title="Küçült">
+            ─
+          </button>
+          <button type="button" class="win-btn win-btn-close" id="btnClose" aria-label="Kapat" title="Kapat">
+            ✕
+          </button>
+        </div>
+      </div>
+
+      <header class="chrome glass">
+        <div class="brand">
+          <div class="brand-name">Raindrop</div>
+          <div class="brand-tag">Mail Sender · Atamation</div>
+        </div>
+        <div class="status-pill" id="statusPill" data-tone="idle" role="status" aria-live="polite">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span id="statusText">Hazır</span>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <section class="compose" aria-label="Mail oluştur">
+          <h1 class="compose-heading">Yeni gönderim</h1>
+          <p class="compose-hint">
+            Alıcıları virgülle ayır. Ekler için dosya seçiciyi kullan.
+          </p>
+
+          <div class="field">
+            <label for="recipients">Alıcılar</label>
+            <input
+              id="recipients"
+              type="text"
+              placeholder="mail1@domain.com, mail2@domain.com"
+              autocomplete="off"
+            />
+          </div>
+
+          <div class="field">
+            <label for="subject">Konu</label>
+            <input id="subject" type="text" placeholder="Konu satırı" autocomplete="off" />
+          </div>
+
+          <div class="field field-grow">
+            <label for="body">Mesaj</label>
+            <textarea id="body" placeholder="Mail gövdesi…"></textarea>
+          </div>
+
+          <div class="field">
+            <label>Ekler</label>
+            <div class="attachments" id="attachmentList" aria-live="polite"></div>
+          </div>
+        </section>
+
+        <aside class="inspector glass" aria-label="Ayarlar">
+          <div class="tab-bar" role="tablist" aria-label="Yan panel">
+            <button type="button" class="tab active" role="tab" data-tab="account" aria-selected="true">
+              Hesap
+            </button>
+            <button type="button" class="tab" role="tab" data-tab="schedule" aria-selected="false">
+              Zamanlama
+            </button>
+            <button type="button" class="tab" role="tab" data-tab="activity" aria-selected="false">
+              Aktivite
+            </button>
+          </div>
+
+          <div class="tab-panels">
+            <div class="tab-panel active" id="panel-account" role="tabpanel">
+              <div class="field">
+                <label for="gmailAddress">Gmail adresi</label>
+                <input id="gmailAddress" type="email" autocomplete="username" />
+              </div>
+              <div class="field">
+                <label for="appPassword">Uygulama şifresi</label>
+                <input
+                  id="appPassword"
+                  type="password"
+                  placeholder="Değiştirmek için yeni şifre yaz"
+                  autocomplete="current-password"
+                />
+              </div>
+              <div class="field">
+                <label for="reportEmail">Hata raporu adresi</label>
+                <input id="reportEmail" type="email" />
+              </div>
+              <div class="field">
+                <label for="smtpPort">SMTP port</label>
+                <input id="smtpPort" type="text" value="587" />
+              </div>
+            </div>
+
+            <div class="tab-panel" id="panel-schedule" role="tabpanel" hidden>
+              <div class="trigger-form">
+                <p class="section-title">Ayarlar</p>
+
+                <div class="field">
+                  <label>Görevi başlat</label>
+                  <select id="scheduleBegin" class="glass-select" disabled>
+                    <option selected>Zamanlanmış (On a schedule)</option>
+                  </select>
+                </div>
+
+                <div class="freq-start">
+                  <div class="freq-radios" role="radiogroup" aria-label="Sıklık">
+                    <label class="radio-row"
+                      ><input type="radio" name="scheduleFrequency" value="once" /> Bir
+                      kez</label
+                    >
+                    <label class="radio-row"
+                      ><input type="radio" name="scheduleFrequency" value="daily" />
+                      Günlük</label
+                    >
+                    <label class="radio-row"
+                      ><input
+                        type="radio"
+                        name="scheduleFrequency"
+                        value="weekly"
+                        checked
+                      />
+                      Haftalık</label
+                    >
+                    <label class="radio-row"
+                      ><input type="radio" name="scheduleFrequency" value="monthly" />
+                      Aylık</label
+                    >
+                  </div>
+
+                  <div class="freq-details">
+                    <div class="field-row">
+                      <div class="field">
+                        <label for="scheduleStartDate">Başlangıç</label>
+                        <input id="scheduleStartDate" type="date" />
+                      </div>
+                      <div class="field">
+                        <label for="scheduleTime">Saat</label>
+                        <input id="scheduleTime" type="time" step="60" value="09:00" />
+                      </div>
+                    </div>
+                    <label class="toggle-row tight" for="scheduleSyncTz">
+                      <input id="scheduleSyncTz" type="checkbox" />
+                      <span>Saat dilimleri arasında senkronize et</span>
+                    </label>
+
+                    <div class="field" id="wrapInterval">
+                      <label for="scheduleInterval"
+                        >Her
+                        <input
+                          id="scheduleInterval"
+                          class="inline-num"
+                          type="number"
+                          min="1"
+                          max="365"
+                          value="1"
+                        />
+                        <span id="intervalUnit">haftada bir</span></label
+                      >
+                    </div>
+
+                    <div class="field" id="wrapWeekdays">
+                      <label>Günler</label>
+                      <div class="day-grid" id="weekdayGrid">
+                        <label class="day-chip"
+                          ><input type="checkbox" value="sun" /> Paz</label
+                        >
+                        <label class="day-chip"
+                          ><input type="checkbox" value="mon" checked /> Pzt</label
+                        >
+                        <label class="day-chip"
+                          ><input type="checkbox" value="tue" checked /> Sal</label
+                        >
+                        <label class="day-chip"
+                          ><input type="checkbox" value="wed" checked /> Çar</label
+                        >
+                        <label class="day-chip"
+                          ><input type="checkbox" value="thu" checked /> Per</label
+                        >
+                        <label class="day-chip"
+                          ><input type="checkbox" value="fri" checked /> Cum</label
+                        >
+                        <label class="day-chip"
+                          ><input type="checkbox" value="sat" /> Cmt</label
+                        >
+                      </div>
+                    </div>
+
+                    <div class="field" id="wrapMonthDay" hidden>
+                      <label for="scheduleMonthDay">Ayın günü</label>
+                      <input
+                        id="scheduleMonthDay"
+                        type="number"
+                        min="1"
+                        max="31"
+                        value="1"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <p class="section-title">Gelişmiş ayarlar</p>
+
+                <label class="adv-row" for="delayEnabled">
+                  <input id="delayEnabled" type="checkbox" />
+                  <span class="adv-label">Görevi şu kadar geciktir (rastgele)</span>
+                  <select id="delayFor" class="glass-select adv-control" disabled>
+                    <option>30 seconds</option>
+                    <option>1 minute</option>
+                    <option>15 minutes</option>
+                    <option>30 minutes</option>
+                    <option selected>1 hour</option>
+                    <option>4 hours</option>
+                    <option>8 hours</option>
+                  </select>
+                </label>
+
+                <div class="adv-block">
+                  <label class="adv-row" for="repeatEnabled">
+                    <input id="repeatEnabled" type="checkbox" />
+                    <span class="adv-label">Görevi tekrarla, her</span>
+                    <select id="repeatEvery" class="glass-select adv-control" disabled>
+                      <option>5 minutes</option>
+                      <option>10 minutes</option>
+                      <option>15 minutes</option>
+                      <option selected>20 minutes</option>
+                      <option>30 minutes</option>
+                      <option>1 hour</option>
+                    </select>
+                  </label>
+                  <label class="adv-row indent" for="repeatFor">
+                    <span class="adv-label muted">süresi:</span>
+                    <select id="repeatFor" class="glass-select adv-control" disabled>
+                      <option>1 hour</option>
+                      <option selected>8 hours</option>
+                      <option>12 hours</option>
+                      <option>1 day</option>
+                      <option>indefinitely</option>
+                    </select>
+                  </label>
+                  <label class="toggle-row tight indent" for="repeatStopAtEnd">
+                    <input id="repeatStopAtEnd" type="checkbox" disabled />
+                    <span>Süre bitince çalışan görevleri durdur</span>
+                  </label>
+                </div>
+
+                <label class="adv-row" for="stopLongerEnabled">
+                  <input id="stopLongerEnabled" type="checkbox" />
+                  <span class="adv-label">Şundan uzun sürerse durdur</span>
+                  <select id="stopLongerFor" class="glass-select adv-control" disabled>
+                    <option>1 hour</option>
+                    <option>2 hours</option>
+                    <option>4 hours</option>
+                    <option>8 hours</option>
+                    <option>12 hours</option>
+                    <option>1 day</option>
+                    <option selected>3 days</option>
+                  </select>
+                </label>
+
+                <div class="adv-block">
+                  <label class="adv-row" for="expireEnabled">
+                    <input id="expireEnabled" type="checkbox" />
+                    <span class="adv-label">Bitiş</span>
+                    <input id="expireDate" type="date" class="adv-control" disabled />
+                    <input
+                      id="expireTime"
+                      type="time"
+                      class="adv-control"
+                      value="21:00"
+                      disabled
+                    />
+                  </label>
+                </div>
+
+                <label class="toggle-row" for="scheduleEnabled">
+                  <input id="scheduleEnabled" type="checkbox" />
+                  <span>Etkin (Enabled)</span>
+                </label>
+
+                <p class="compose-hint status-line" id="scheduleStatus">Durum yükleniyor…</p>
+              </div>
+            </div>
+
+            <div class="tab-panel" id="panel-activity" role="tabpanel" hidden>
+              <pre class="log-view" id="logView">Log yükleniyor…</pre>
+            </div>
+          </div>
+        </aside>
+      </main>
+
+      <footer class="action-bar glass" role="toolbar" aria-label="Eylemler">
+        <div class="action-left">
+          <button type="button" class="btn btn-ghost" id="btnAttach">Dosya ekle</button>
+          <button type="button" class="btn btn-ghost" id="btnClearAttach">Ekleri temizle</button>
+          <button type="button" class="btn btn-ghost" id="btnRefreshLog">Log yenile</button>
+        </div>
+        <div class="action-right">
+          <button type="button" class="btn btn-ghost" id="btnSave">Ayarları kaydet</button>
+          <button type="button" class="btn btn-primary" id="btnSend">Gönder</button>
+        </div>
+      </footer>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
