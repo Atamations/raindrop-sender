@@ -291,8 +291,25 @@ function applyAccount(account) {
     : "16 haneli Uygulama Şifresi";
 }
 
+function clearEditor() {
+  activeSessionId = null;
+  $("sessionName").value = "";
+  $("recipients").value = "";
+  $("subject").value = "";
+  $("body").value = "";
+  $("sessionReportEmail").value = "";
+  attachmentPaths = [];
+  renderAttachments();
+  $("sessionMeta").textContent = "Oturum yok — + ile yeni ekle";
+  $("scheduleEnabled").checked = false;
+  $("scheduleStatus").textContent = "Oturum seçilmedi.";
+}
+
 function applySession(session, schedule, summary) {
-  if (!session) return;
+  if (!session) {
+    clearEditor();
+    return;
+  }
   activeSessionId = session.id;
   $("sessionName").value = session.name || "Oturum";
   $("recipients").value = session.recipients || "";
@@ -326,7 +343,7 @@ function renderSessionsList() {
   if (!sessionsCache.length) {
     const empty = document.createElement("p");
     empty.className = "compose-hint";
-    empty.textContent = "Oturum yok — + ile ekle";
+    empty.textContent = "Liste boş — + ile oturum ekle";
     root.appendChild(empty);
     return;
   }
@@ -483,7 +500,11 @@ function switchTab(tabName) {
 function ingestListPayload(data) {
   if (!data) return;
   sessionsCache = Array.isArray(data.sessions) ? data.sessions : sessionsCache;
-  if (data.active_id) activeSessionId = data.active_id;
+  if ("active_id" in data) {
+    activeSessionId = data.active_id || null;
+  } else if (data.active_id) {
+    activeSessionId = data.active_id;
+  }
   if (data.account) applyAccount(data.account);
   renderSessionsList();
 }
@@ -514,9 +535,11 @@ async function loadInitial() {
     const sid = (listed && listed.active_id) || (sessionsCache[0] && sessionsCache[0].id);
     if (sid) {
       await loadSessionDetail(sid);
+    } else {
+      clearEditor();
     }
     await refreshLog();
-    setStatus("Hazır", "idle");
+    setStatus(sessionsCache.length ? "Hazır" : "Oturum yok — + ile ekle", "idle");
   } catch (err) {
     setStatus(String(err), "err");
   }
@@ -569,6 +592,8 @@ async function onDeleteSession(sessionId) {
     ingestListPayload(data);
     if (data.session) {
       applySession(data.session, data.schedule, data.summary);
+    } else {
+      clearEditor();
     }
     setStatus(data.message || "Silindi", "ok");
   } catch (err) {
@@ -608,6 +633,10 @@ async function onToggleAutomation(sessionId, enabled) {
 
 async function onSave() {
   clearFieldErrors();
+  if (!activeSessionId) {
+    setStatus("Önce + ile oturum oluştur.", "err");
+    return;
+  }
   setStatus("Kaydediliyor…", "busy");
   $("btnSave").disabled = true;
   try {
@@ -686,6 +715,10 @@ async function runBackgroundSend(sessionId) {
 
 async function onSend() {
   clearFieldErrors();
+  if (!activeSessionId) {
+    setStatus("Önce + ile oturum oluştur.", "err");
+    return;
+  }
   const err = validateBeforeSend();
   if (err) {
     setStatus(err, "err");
@@ -720,6 +753,10 @@ async function onSend() {
 /** Tarih/saati şimdiye alır, otomasyonu kaydeder ve bir kez gönderir. */
 async function onStartNow() {
   clearFieldErrors();
+  if (!activeSessionId) {
+    setStatus("Önce + ile oturum oluştur.", "err");
+    return;
+  }
   const err = validateBeforeSend();
   if (err) {
     setStatus(err, "err");

@@ -154,31 +154,60 @@ def _session_summary(session: dict[str, Any]) -> dict[str, Any]:
 
 def migrate_legacy_if_needed() -> None:
     """
-    Eski tek-.env / schedule.json kurulumunu ilk oturuma taşır.
+    Eski tek-.env / schedule.json kurulumunu yalnızca bir kez ilk oturuma taşır.
+    Kullanıcı tüm oturumları sildiyse boş liste korunur (yeniden üretmez).
     """
     _ensure_store()
     index = _read_index()
-    if index.get("order"):
+    if index.get("order") or index.get("legacy_migrated"):
+        return
+
+    # Diskte zaten oturum dosyası varsa sadece bayrağı işaretle
+    existing_files = list(SESSIONS_DIR.glob("s_*.json"))
+    if existing_files:
+        order = [p.stem for p in sorted(existing_files)]
+        index["order"] = order
+        index["active_id"] = order[0]
+        index["legacy_migrated"] = True
+        _write_index(index)
         return
 
     account = config_for_ui()
-    legacy_sched = load_schedule_prefs() if (BASE_DIR / "schedule.json").is_file() else _default_schedule()
+    legacy_sched = (
+        load_schedule_prefs()
+        if (BASE_DIR / "schedule.json").is_file()
+        else _default_schedule()
+    )
 
-    has_mail = bool(account.get("recipients") or account.get("subject") or account.get("body"))
+    has_mail = bool(
+        account.get("recipients") or account.get("subject") or account.get("body")
+    )
+    # İlk kurulumda .env yoksa boş bırak — kullanıcı + ile ekler
+    if not (has_mail or account.get("env_exists")):
+        index["legacy_migrated"] = True
+        index["active_id"] = None
+        index["order"] = []
+        _write_index(index)
+        return
+
     session = _blank_session("Varsayılan oturum")
-    if has_mail or account.get("env_exists"):
-        session["recipients"] = account.get("recipients") or ""
-        session["subject"] = account.get("subject") or ""
-        session["body"] = account.get("body") or ""
-        session["attachment_path"] = account.get("attachment_path") or ""
-        session["report_email"] = ""
-        session["schedule"] = legacy_sched
-        # Legacy tek görev adı — yeni id ile yeniden yazılacak; eski görevi kapatmaya çalışma şart değil
-        if legacy_sched.get("enabled"):
-            session["schedule"] = {**legacy_sched, "enabled": True}
+    session["recipients"] = account.get("recipients") or ""
+    session["subject"] = account.get("subject") or ""
+    session["body"] = account.get("body") or ""
+    session["attachment_path"] = account.get("attachment_path") or ""
+    session["report_email"] = ""
+    session["schedule"] = legacy_sched
+    if legacy_sched.get("enabled"):
+        session["schedule"] = {**legacy_sched, "enabled": True}
 
     _write_session(session)
-    _write_index({"active_id": session["id"], "order": [session["id"]]})
+    _write_index(
+        {
+            "active_id": session["id"],
+            "order": [session["id"]],
+            "legacy_migrated": True,
+        }
+    )
     logging.info("İlk oturum oluşturuldu: %s", session["id"])
 
 
@@ -268,6 +297,7 @@ def create_session(name: str | None = None) -> dict[str, Any]:
     index = _read_index()
     index.setdefault("order", []).append(session["id"])
     index["active_id"] = session["id"]
+    index["legacy_migrated"] = True
     _write_index(index)
     logging.info("Yeni oturum: %s (%s)", session["name"], session["id"])
     return get_session(session["id"]) | {"sessions": list_sessions()["sessions"]}
@@ -296,17 +326,28 @@ def delete_session(session_id: str) -> dict[str, Any]:
     index["order"] = [x for x in index.get("order", []) if x != session_id]
     if index.get("active_id") == session_id:
         index["active_id"] = index["order"][0] if index["order"] else None
+    # Boş kalsın — otomatik Varsayılan üretme
+    index["legacy_migrated"] = True
     _write_index(index)
 
-    if not index["order"]:
-        created = create_session("Varsayılan oturum")
-        return {"ok": True, "message": "Oturum silindi; yeni varsayılan açıldı.", **created}
+    listed = list_sessions()
+    if not listed.get("sessions"):
+        return {
+            "ok": True,
+            "message": "Tüm oturumlar silindi.",
+            "session": None,
+            "schedule": None,
+            "summary": None,
+            "account": listed.get("account"),
+            "sessions": [],
+            "active_id": None,
+        }
 
-    active = index["active_id"]
-    result = get_session(str(active)) if active else list_sessions()
+    active = listed.get("active_id")
+    result = get_session(str(active)) if active else listed
     result["ok"] = True
     result["message"] = "Oturum silindi."
-    result["sessions"] = list_sessions()["sessions"]
+    result["sessions"] = listed["sessions"]
     return result
 
 
