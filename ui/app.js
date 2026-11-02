@@ -80,6 +80,89 @@ function todayIso() {
   return `${d.getFullYear()}-${m}-${day}`;
 }
 
+function nowHm() {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+/** @returns {string|null} normalize HH:MM or null */
+function normalizeHm(raw) {
+  const v = String(raw || "").trim();
+  const m = v.match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  if (h > 23 || min > 59) return null;
+  return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
+}
+
+function wireTimeInput(id) {
+  const el = $(id);
+  if (!el || el.dataset.timeWired) return;
+  el.dataset.timeWired = "1";
+  el.addEventListener("blur", () => {
+    const n = normalizeHm(el.value);
+    if (n) el.value = n;
+  });
+  el.addEventListener("input", () => {
+    let t = el.value.replace(/[^\d:]/g, "");
+    if (t.length === 2 && !t.includes(":")) t = `${t}:`;
+    if (t.length > 5) t = t.slice(0, 5);
+    el.value = t;
+  });
+}
+
+function setSendBusy(busy, label) {
+  const btn = $("btnSend");
+  if (!btn) return;
+  btn.disabled = !!busy;
+  if (busy) btn.setAttribute("aria-busy", "true");
+  else btn.removeAttribute("aria-busy");
+  if (label) btn.textContent = label;
+  else btn.textContent = "Gönder";
+}
+
+/**
+ * Arka plan gönderimini yoklar; UI'yi kilitlemez.
+ * @returns {Promise<Record<string, unknown>>}
+ */
+function pollSendJob(timeoutMs) {
+  const started = Date.now();
+  return new Promise((resolve) => {
+    const tick = async () => {
+      try {
+        const job = await api("get_send_job");
+        if (job && job.message) setStatus(job.message, job.busy ? "busy" : "idle");
+        if (!job || !job.busy) {
+          resolve(job || { busy: false, result: null, message: "Bitti" });
+          return;
+        }
+        if (Date.now() - started > timeoutMs) {
+          resolve({
+            busy: false,
+            timedOut: true,
+            message: "Zaman aşımı — gönderim arka planda sürebilir; logu kontrol et.",
+            result: {
+              ok: false,
+              message: "Gönderim zaman aşımına uğradı (UI açıldı).",
+            },
+          });
+          return;
+        }
+      } catch (err) {
+        resolve({
+          busy: false,
+          message: String(err),
+          result: { ok: false, message: String(err) },
+        });
+        return;
+      }
+      setTimeout(tick, 400);
+    };
+    tick();
+  });
+}
+
 function selectedWeekdays() {
   return Array.from(
     document.querySelectorAll("#weekdayGrid input[type='checkbox']:checked")
@@ -303,7 +386,18 @@ function renderSessionsList() {
   });
 }
 
-function collectSessionPayload() {
+/**
+ * @param {{ applySchedule?: boolean }} [opts]
+ */
+function collectSessionPayload(opts) {
+  const applySchedule = !opts || opts.applySchedule !== false;
+  const time = normalizeHm($("scheduleTime").value) || "09:00";
+  const expireTime = normalizeHm($("expireTime").value) || "21:00";
+  $("scheduleTime").value = time;
+  $("expireTime").value = expireTime;
+  const schedule = collectSchedulePayload();
+  schedule.time = time;
+  schedule.expire_time = expireTime;
   return {
     id: activeSessionId,
     name: $("sessionName").value.trim() || "Oturum",
@@ -317,7 +411,8 @@ function collectSessionPayload() {
     account_report_email: $("reportEmail").value.trim(),
     smtp_host: "smtp.gmail.com",
     smtp_port: $("smtpPort").value.trim() || "587",
-    schedule: collectSchedulePayload(),
+    schedule,
+    apply_schedule: applySchedule,
   };
 }
 
@@ -545,43 +640,116 @@ async function onSave() {
   }
 }
 
-async function onSend() {
-  const btn = $("btnSend");
-  btn.disabled = true;
-  btn.setAttribute("aria-busy", "true");
-  clearFieldErrors();
-  setStatus("Gönderiliyor…", "busy");
+async function runBackgroundSend(sessionId) {
+  setSendBusy(true, "Gönderiliyor…");
+  setStatus("Gönderim başlatılıyor…", "busy");
   try {
-    const err = validateBeforeSend();
-    if (err) {
-      setStatus(err, "err");
-      return;
+    const started = await api("start_send", sessionId || "");
+    if (!started || started.ok === false || !started.started) {
+      setStatus((started && started.message) || "Gönderim başlatılamadı", "err");
+      return null;
     }
+    setStatus(started.message || "SMTP bağlanıyor…", "busy");
+    const job = await pollSendJob(90000);
+    const result = (job && job.result) || null;
+    if (job && job.timedOut) {
+      setStatus(job.message, "err");
+      switchTab("activity");
+      await refreshLog();
+      return result;
+    }
+    if (result && result.ok) {
+      setStatus(result.message || "Gönderildi", "ok");
+    } else {
+      setStatus(
+        (result && result.message) || (job && job.message) || "Gönderim başarısız",
+        "err"
+      );
+    }
+    await refreshLog();
+    return result;
+  } catch (err) {
+    setStatus(err.message || String(err), "err");
+    await refreshLog();
+    return null;
+  } finally {
+    setSendBusy(false);
+  }
+}
 
-    const saved = await api("save_session", collectSessionPayload());
+async function onSend() {
+  clearFieldErrors();
+  const err = validateBeforeSend();
+  if (err) {
+    setStatus(err, "err");
+    return;
+  }
+
+  setSendBusy(true, "Kaydediliyor…");
+  setStatus("Kaydediliyor…", "busy");
+  try {
+    const saved = await api(
+      "save_session",
+      collectSessionPayload({ applySchedule: false })
+    );
     if (!saved || saved.ok === false) {
       markFieldError(saved && saved.field);
       setStatus((saved && saved.message) || "Kayıt başarısız — gönderilmedi", "err");
+      await refreshLog();
+      setSendBusy(false);
+      return;
+    }
+    ingestListPayload(saved);
+    applySession(saved.session, saved.schedule, saved.summary);
+  } catch (e) {
+    setStatus(e.message || String(e), "err");
+    setSendBusy(false);
+    return;
+  }
+
+  await runBackgroundSend(activeSessionId || "");
+}
+
+/** Tarih/saati şimdiye alır, otomasyonu kaydeder ve bir kez gönderir. */
+async function onStartNow() {
+  clearFieldErrors();
+  const err = validateBeforeSend();
+  if (err) {
+    setStatus(err, "err");
+    if (err.includes("rapor") || err.includes("Gmail")) switchTab("account");
+    else switchTab("schedule");
+    return;
+  }
+
+  $("scheduleStartDate").value = todayIso();
+  $("scheduleTime").value = nowHm();
+  $("scheduleEnabled").checked = true;
+  switchTab("schedule");
+
+  setSendBusy(true, "Başlatılıyor…");
+  setStatus("Şimdi başlatılıyor — kaydediliyor…", "busy");
+  try {
+    const saved = await api(
+      "save_session",
+      collectSessionPayload({ applySchedule: true })
+    );
+    if (!saved || saved.ok === false) {
+      markFieldError(saved && saved.field);
+      setStatus((saved && saved.message) || "Kayıt başarısız", "err");
+      setSendBusy(false);
       await refreshLog();
       return;
     }
     ingestListPayload(saved);
     applySession(saved.session, saved.schedule, saved.summary);
-
-    const result = await api("send_mail", activeSessionId || "");
-    if (result && result.ok) {
-      setStatus(result.message || "Gönderildi", "ok");
-    } else {
-      setStatus((result && result.message) || "Gönderim başarısız", "err");
-    }
-    await refreshLog();
-  } catch (err) {
-    setStatus(err.message || String(err), "err");
-    await refreshLog();
-  } finally {
-    btn.disabled = false;
-    btn.removeAttribute("aria-busy");
+    setStatus("Otomasyon kaydedildi — şimdi bir kez gönderiliyor…", "busy");
+  } catch (e) {
+    setStatus(e.message || String(e), "err");
+    setSendBusy(false);
+    return;
   }
+
+  await runBackgroundSend(activeSessionId || "");
 }
 
 async function onAttach() {
@@ -637,6 +805,11 @@ function wire() {
     refreshLog();
   });
   $("btnNewSession").addEventListener("click", onNewSession);
+  if ($("btnStartNow")) {
+    $("btnStartNow").addEventListener("click", onStartNow);
+  }
+  wireTimeInput("scheduleTime");
+  wireTimeInput("expireTime");
   wireWindowControls();
 
   document.querySelectorAll('input[name="scheduleFrequency"]').forEach((el) => {

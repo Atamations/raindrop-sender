@@ -395,25 +395,31 @@ def save_session_payload(payload: dict[str, Any]) -> dict[str, Any]:
             "schedule": _sanitize_prefs(schedule_raw),
         }
 
-        # Zamanlamayı Windows'a uygula
-        try:
-            sched_status = apply_schedule_for_session(
-                session["schedule"],
-                session_id=session_id,
-                session_name=name,
-            )
-        except Exception as exc:
-            logging.exception("Zamanlama uygulanamadı.")
-            return {
-                "ok": False,
-                "message": f"Oturum kaydedilemedi (zamanlama): {exc}",
-                "field": "schedule",
+        apply_sched = bool(payload.get("apply_schedule", True))
+        if apply_sched:
+            try:
+                sched_status = apply_schedule_for_session(
+                    session["schedule"],
+                    session_id=session_id,
+                    session_name=name,
+                )
+            except Exception as exc:
+                logging.exception("Zamanlama uygulanamadı.")
+                return {
+                    "ok": False,
+                    "message": f"Oturum kaydedilemedi (zamanlama): {exc}",
+                    "field": "schedule",
+                }
+            session["schedule"] = {
+                **session["schedule"],
+                "enabled": bool(sched_status.get("enabled")),
             }
+        else:
+            # Gönderim öncesi hızlı kayıt — Task Scheduler'a dokunma
+            sched_status = get_schedule_status_for_session(
+                session["schedule"], session_id
+            )
 
-        session["schedule"] = {
-            **session["schedule"],
-            "enabled": bool(sched_status.get("enabled")),
-        }
         _write_session(session)
 
         index = _read_index()

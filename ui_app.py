@@ -99,9 +99,95 @@ class MailApi:
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._window: webview.Window | None = None
+        self._send_lock = threading.Lock()
+        self._send_job: dict[str, Any] = {
+            "busy": False,
+            "phase": "idle",
+            "message": "",
+            "result": None,
+        }
 
     def set_window(self, window: webview.Window) -> None:
         self._window = window
+
+    def get_send_job(self) -> dict[str, Any]:
+        """UI yoklaması — gönderim arka planda; bu çağrı bloklamaz."""
+        with self._send_lock:
+            return {
+                "busy": bool(self._send_job.get("busy")),
+                "phase": str(self._send_job.get("phase") or "idle"),
+                "message": str(self._send_job.get("message") or ""),
+                "result": self._send_job.get("result"),
+            }
+
+    def _set_send_job(self, **kwargs: Any) -> None:
+        with self._send_lock:
+            self._send_job.update(kwargs)
+
+    def start_send(self, session_id: str = "") -> dict[str, Any]:
+        """
+        SMTP'yi arka plan thread'inde başlatır; hemen döner.
+        UI donmasın diye send_mail senkron kullanılmamalı.
+        """
+        with self._send_lock:
+            if self._send_job.get("busy"):
+                return {
+                    "ok": False,
+                    "started": False,
+                    "message": "Zaten bir gönderim sürüyor.",
+                }
+            self._send_job = {
+                "busy": True,
+                "phase": "starting",
+                "message": "Gönderim kuyruğa alındı…",
+                "result": None,
+            }
+
+        def worker() -> None:
+            config = None
+            try:
+                self._set_send_job(phase="config", message="Yapılandırma okunuyor…")
+                config = build_send_config(session_id or None)
+                self._set_send_job(
+                    phase="smtp",
+                    message=f"SMTP bağlanıyor ({config.get('session_name') or 'oturum'})…",
+                )
+                logging.info(
+                    "UI arka plan gönderim (session=%s).",
+                    config.get("session_id") or "-",
+                )
+                result = send_campaign(config)
+                logging.info("UI gönderim özeti: %s", result["message"])
+                self._set_send_job(
+                    busy=False,
+                    phase="done",
+                    message=str(result.get("message") or "Bitti"),
+                    result=result,
+                )
+            except Exception as exc:
+                logging.exception("UI arka plan gönderimi başarısız.")
+                send_error_report_safe(config, "UI üzerinden gönderim hatası.", exc)
+                fail = {
+                    "ok": False,
+                    "ok_count": 0,
+                    "fail_count": 1,
+                    "ok_recipients": [],
+                    "failed": [],
+                    "message": str(exc),
+                }
+                self._set_send_job(
+                    busy=False,
+                    phase="error",
+                    message=str(exc),
+                    result=fail,
+                )
+
+        threading.Thread(target=worker, name="raindrop-send", daemon=True).start()
+        return {
+            "ok": True,
+            "started": True,
+            "message": "Gönderim başladı — UI kilitlenmez.",
+        }
 
     def minimize(self) -> None:
         if self._window is not None:

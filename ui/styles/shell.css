@@ -452,6 +452,26 @@ button {
   box-shadow: 0 0 0 1px rgba(240, 113, 120, 0.25);
 }
 
+.time-hm {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  max-width: 7.5rem;
+}
+
+.quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  margin: 2px 0 var(--space-2);
+}
+
+.btn-compact {
+  padding: 7px 12px !important;
+  min-height: 34px;
+  font-size: var(--text-sm);
+}
+
 .compose {
   display: flex;
   flex-direction: column;

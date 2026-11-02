@@ -92,10 +92,10 @@ def open_smtp(config: dict[str, Any]) -> smtplib.SMTP | smtplib.SMTP_SSL:
 
     if port == 465:
         server: smtplib.SMTP | smtplib.SMTP_SSL = smtplib.SMTP_SSL(
-            host, port, context=context, timeout=30
+            host, port, context=context, timeout=20
         )
     else:
-        server = smtplib.SMTP(host, port, timeout=30)
+        server = smtplib.SMTP(host, port, timeout=20)
         server.ehlo()
         server.starttls(context=context)
         server.ehlo()

@@ -180,9 +180,25 @@
                         <input id="scheduleStartDate" type="date" />
                       </div>
                       <div class="field">
-                        <label for="scheduleTime">Saat</label>
-                        <input id="scheduleTime" type="time" step="60" value="09:00" />
+                        <label for="scheduleTime">Saat (HH:MM)</label>
+                        <input
+                          id="scheduleTime"
+                          class="time-hm"
+                          type="text"
+                          inputmode="numeric"
+                          placeholder="09:00"
+                          maxlength="5"
+                          value="09:00"
+                          autocomplete="off"
+                          spellcheck="false"
+                        />
                       </div>
+                    </div>
+                    <div class="quick-actions">
+                      <button type="button" class="btn btn-ghost btn-compact" id="btnStartNow">
+                        Şimdi Başla
+                      </button>
+                      <span class="compose-hint">Tarih/saati şimdiye alır, kaydeder ve bir kez gönderir</span>
                     </div>
                     <label class="toggle-row tight" for="scheduleSyncTz">
                       <input id="scheduleSyncTz" type="checkbox" />
@@ -310,9 +326,14 @@
                     <input id="expireDate" type="date" class="adv-control" disabled />
                     <input
                       id="expireTime"
-                      type="time"
-                      class="adv-control"
+                      type="text"
+                      class="adv-control time-hm"
+                      inputmode="numeric"
+                      placeholder="21:00"
+                      maxlength="5"
                       value="21:00"
+                      autocomplete="off"
+                      spellcheck="false"
                       disabled
                     />
                   </label>
