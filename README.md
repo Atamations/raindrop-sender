@@ -1,17 +1,27 @@
 ﻿# Raindrop Mail Sender
 
-**Atamation** — Gmail SMTP · **v2.1.1**
+**Atamation** — Gmail SMTP · **v2.1.2**
 
-## v2.1.1
-- Gönderim UI kilidi yok: arka plan SMTP + durum yoklaması
-- Saat girişi HH:MM (native AM/PM spinner kaldırıldı)
-- **Şimdi Başla**: tarihi/saati şimdiye alır, otomasyonu kaydeder, bir kez gönderir
-- Çoklu oturum menüsü (v2.1.0)
+Çerçevesiz UI · çoklu oturum · Task Scheduler otomasyonu.
 
-## Kurulum
-[Releases](https://github.com/Atamations/raindrop-sender/releases) → v2.1.1 zip
+## v2.1.2
+- Tekrar aralığı min. **5 dakika** (Windows TS uyumu)
+- Tüm oturumlar silinince liste **boş kalır** (otomatik Varsayılan yok)
+- Gönderim UI kilidi yok (arka plan SMTP)
+- Saat: HH:MM + **Şimdi Başla**
+- `run_mailer.bat` / exe fallback
 
-## Geliştirici
-`python ui_app.py` · `build_exe.bat`
+## Exe
+[Releases](https://github.com/Atamations/raindrop-sender/releases) → **v2.1.2**
+
+```bash
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+copy .env.example .env
+python ui_app.py
+```
+
+Exe: `build_exe.bat`
 
 © Atamation
