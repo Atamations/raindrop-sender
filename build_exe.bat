@@ -3,8 +3,10 @@ cd /d "%~dp0"
 call .venv\Scripts\activate.bat
 python -m pip install -q pyinstaller
 pyinstaller --noconfirm --clean --windowed --name RaindropMailSender ^
+  --icon "assets\raindrop.ico" ^
   --paths . ^
   --add-data "ui;ui" ^
+  --add-data "assets;assets" ^
   --add-data "run_mailer.bat;." ^
   --add-data ".env.example;." ^
   --hidden-import mailer ^

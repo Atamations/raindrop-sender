@@ -1,12 +1,13 @@
 # Raindrop Mail Sender
 
-**Atamation** — Gmail SMTP mail gönderici · **v2.0**
+**Atamation** — Gmail SMTP mail gönderici · **v2.0.1**
 
 Çerçevesiz masaüstü UI (pywebview) + Task Scheduler seviyesinde zamanlama + tek seferlik CLI.
 
-## v2.0 Öne çıkanlar
+## v2.0.1 Öne çıkanlar
 
-- Liquid Glass-inspired masaüstü arayüz (çerçevesiz pencere)
+- Resmi Raindrop uygulama ikonu (exe + pencere + kısayol)
+- Çerçevesiz masaüstü arayüz + sürüklenebilir title bar
 - Hesap / Zamanlama / Aktivite sekmeleri
 - Edit Trigger tarzı zamanlama (bir kez, günlük, haftalık, aylık + gelişmiş tekrar/bitiş)
 - Çoklu alıcı, ek dosya, yalnızca hata durumunda `REPORT_EMAIL` bildirimi
@@ -14,7 +15,7 @@
 
 ## Hızlı başlangıç (exe)
 
-1. [Releases](https://github.com/Atamations/raindrop-sender/releases) sayfasından **v2.0** paketini indirin
+1. [Releases](https://github.com/Atamations/raindrop-sender/releases) sayfasından **v2.0.1** paketini indirin
 2. Klasörde `.env.example` → `.env` kopyalayın ve doldurun
 3. `RaindropMailSender.exe` çalıştırın  
    veya masaüstü kısayolunu kullanın

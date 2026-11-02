@@ -4,13 +4,15 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Raindrop Mail Sender</title>
+    <link rel="icon" type="image/png" href="favicon.png" />
     <link rel="stylesheet" href="styles/tokens.css" />
     <link rel="stylesheet" href="styles/shell.css" />
   </head>
   <body>
     <div class="app" id="app">
       <div class="titlebar" role="banner">
-        <div class="titlebar-drag">
+        <!-- pywebview Windows: sürükleme için .pywebview-drag-region zorunlu -->
+        <div class="titlebar-drag pywebview-drag-region">
           <span class="titlebar-title">Raindrop Mail Sender</span>
         </div>
         <div class="titlebar-controls">

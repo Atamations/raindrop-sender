@@ -99,16 +99,22 @@ button {
   padding: 0 0 0 var(--space-4);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(0, 0, 0, 0.22);
-  -webkit-app-region: drag;
-  app-region: drag;
   user-select: none;
 }
 
-.titlebar-drag {
+.titlebar-drag,
+.pywebview-drag-region {
   flex: 1;
   display: flex;
   align-items: center;
   min-width: 0;
+  height: 100%;
+  cursor: grab;
+}
+
+.titlebar-drag:active,
+.pywebview-drag-region:active {
+  cursor: grabbing;
 }
 
 .titlebar-title {
@@ -120,8 +126,7 @@ button {
 
 .titlebar-controls {
   display: flex;
-  -webkit-app-region: no-drag;
-  app-region: no-drag;
+  flex-shrink: 0;
 }
 
 .win-btn {

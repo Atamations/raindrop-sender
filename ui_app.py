@@ -30,6 +30,9 @@ from mailer.send import send_campaign, send_error_report_safe
 
 UI_DIR = RESOURCE_DIR / "ui"
 INDEX_HTML = UI_DIR / "index.html"
+ICON_PATH = RESOURCE_DIR / "assets" / "raindrop.ico"
+if not ICON_PATH.is_file():
+    ICON_PATH = BASE_DIR / "assets" / "raindrop.ico"
 
 
 def setup_logging() -> None:
@@ -175,7 +178,10 @@ def run_ui() -> int:
     api.set_window(window)
 
     logging.info("UI başlatılıyor…")
-    webview.start(debug=False)
+    start_kwargs: dict[str, Any] = {"debug": False}
+    if ICON_PATH.is_file():
+        start_kwargs["icon"] = str(ICON_PATH)
+    webview.start(**start_kwargs)
     return 0
 
 
