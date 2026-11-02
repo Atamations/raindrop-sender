@@ -178,10 +178,18 @@ def run_ui() -> int:
     api.set_window(window)
 
     logging.info("UI başlatılıyor…")
-    start_kwargs: dict[str, Any] = {"debug": False}
+    logging.info("UI dosyası: %s", INDEX_HTML)
+    logging.info("İkon: %s (var=%s)", ICON_PATH, ICON_PATH.is_file())
+
+    # Geçersiz .ico WinForms'ta process'i çökertir; güvenli dene.
     if ICON_PATH.is_file():
-        start_kwargs["icon"] = str(ICON_PATH)
-    webview.start(**start_kwargs)
+        try:
+            webview.start(debug=False, icon=str(ICON_PATH))
+        except Exception:
+            logging.exception("İkon ile başlatma başarısız; ikonsuz deneniyor.")
+            webview.start(debug=False)
+    else:
+        webview.start(debug=False)
     return 0
 
 
