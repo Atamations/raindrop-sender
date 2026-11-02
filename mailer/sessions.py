@@ -415,7 +415,13 @@ def save_session_payload(payload: dict[str, Any]) -> dict[str, Any]:
                 "enabled": bool(sched_status.get("enabled")),
             }
         else:
-            # Gönderim öncesi hızlı kayıt — Task Scheduler'a dokunma
+            # Gönderim öncesi hızlı kayıt — TS'ye dokunma; enabled bayrağını
+            # mevcut oturumdan koru (formda Etkin açıkken görevsiz "aktif" yazma).
+            preserved = _sanitize_prefs(existing.get("schedule") or {})
+            session["schedule"] = {
+                **session["schedule"],
+                "enabled": bool(preserved.get("enabled")),
+            }
             sched_status = get_schedule_status_for_session(
                 session["schedule"], session_id
             )

@@ -63,8 +63,8 @@ DELAY_CHOICES = {
     "4 hours": "PT4H",
     "8 hours": "PT8H",
 }
+# Windows Task Scheduler tekrar aralığı minimumu pratikte 5 dk.
 REPEAT_EVERY_CHOICES = {
-    "1 minute": "PT1M",
     "5 minutes": "PT5M",
     "10 minutes": "PT10M",
     "15 minutes": "PT15M",
@@ -168,7 +168,11 @@ def _sanitize_prefs(raw: dict[str, Any]) -> dict[str, Any]:
 
     repeat_every = str(raw.get("repeat_every") or "30 minutes")
     if repeat_every not in REPEAT_EVERY_CHOICES:
-        repeat_every = "30 minutes"
+        # Eski "1 minute" vb. Windows min altına düşenleri 5 dk'ya yükselt
+        if repeat_every.strip().lower() in {"1 minute", "1 minutes", "pt1m"}:
+            repeat_every = "5 minutes"
+        else:
+            repeat_every = "30 minutes"
 
     delay_for = str(raw.get("delay_for") or "1 hour")
     if delay_for not in DELAY_CHOICES:
@@ -331,6 +335,21 @@ def _build_calendar_trigger(prefs: dict[str, Any]) -> ET.Element:
     return trigger
 
 
+def _resolve_task_command() -> tuple[Path, str]:
+    """
+    Görev komutu: önce run_mailer.bat, yoksa exe --send.
+    Paket klasöründe bat eksikse otomasyon tamamen düşmesin.
+    """
+    if BAT_PATH.is_file():
+        return BAT_PATH.resolve(), ""
+    exe_path = BASE_DIR / "RaindropMailSender.exe"
+    if exe_path.is_file():
+        return exe_path.resolve(), "--send"
+    raise FileNotFoundError(
+        f"Çalıştırılacak dosya yok: {BAT_PATH} veya {exe_path}"
+    )
+
+
 def build_task_xml(
     prefs: dict[str, Any],
     *,
@@ -338,8 +357,7 @@ def build_task_xml(
     session_name: str = "",
 ) -> str:
     """Windows Task Scheduler 1.2 XML üretir (oturum argümanı ile)."""
-    if not BAT_PATH.is_file():
-        raise FileNotFoundError(f"Çalıştırılacak dosya yok: {BAT_PATH}")
+    command, base_args = _resolve_task_command()
 
     clean = _sanitize_prefs(prefs)
     root = ET.Element(
@@ -387,9 +405,14 @@ def build_task_xml(
 
     actions = ET.SubElement(root, "Actions", {"Context": "Author"})
     exe = ET.SubElement(actions, "Exec")
-    ET.SubElement(exe, "Command").text = str(BAT_PATH.resolve())
+    ET.SubElement(exe, "Command").text = str(command)
+    arg_parts: list[str] = []
+    if base_args:
+        arg_parts.append(base_args)
     if session_id:
-        ET.SubElement(exe, "Arguments").text = f"--session {session_id}"
+        arg_parts.append(f"--session {session_id}")
+    if arg_parts:
+        ET.SubElement(exe, "Arguments").text = " ".join(arg_parts)
     ET.SubElement(exe, "WorkingDirectory").text = str(BASE_DIR.resolve())
 
     rough = ET.tostring(root, encoding="utf-8")
@@ -483,7 +506,10 @@ def _status_from_prefs(prefs: dict[str, Any], task_name: str) -> dict[str, Any]:
     if active:
         message = f"Aktif — {_describe(clean)} (PC açıkken)."
     elif clean.get("enabled") and not registered:
-        message = "Etkin seçili ama Windows görevi eksik — kaydet."
+        message = (
+            "Etkin işaretli ama Windows görevi yok. "
+            "«Ayarları kaydet» ile görevi oluştur."
+        )
     else:
         message = "Kapalı — yalnızca elle gönderim."
 

@@ -393,6 +393,12 @@ button {
   background: rgba(125, 206, 160, 0.1);
 }
 
+.session-badge.is-warn {
+  color: #e6c07b;
+  border-color: rgba(230, 192, 123, 0.45);
+  background: rgba(230, 192, 123, 0.12);
+}
+
 .session-card-meta {
   margin: 0;
   font-size: var(--text-xs);

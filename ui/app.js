@@ -344,9 +344,16 @@ function renderSessionsList() {
     name.className = "session-card-name";
     name.textContent = item.name || "Oturum";
     const badge = document.createElement("span");
+    const pending =
+      !item.schedule_active && !!item.schedule_enabled;
     badge.className =
-      "session-badge" + (item.schedule_active ? " is-on" : "");
-    badge.textContent = item.schedule_active ? "Aktif" : "Kapalı";
+      "session-badge" +
+      (item.schedule_active ? " is-on" : pending ? " is-warn" : "");
+    badge.textContent = item.schedule_active
+      ? "Aktif"
+      : pending
+        ? "Kayıt eksik"
+        : "Kapalı";
     top.appendChild(name);
     top.appendChild(badge);
 
