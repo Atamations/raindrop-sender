@@ -92,8 +92,15 @@ class MailApi:
             self._window.minimize()
 
     def close_window(self) -> None:
-        if self._window is not None:
+        """Frameless X — destroy; CLR teardown gürültüsünü yut."""
+        if self._window is None:
+            return
+        try:
             self._window.destroy()
+        except Exception:
+            logging.debug("Pencere kapatılırken uyarı.", exc_info=True)
+        finally:
+            self._window = None
 
     def get_config(self) -> dict[str, Any]:
         return config_for_ui()
@@ -181,16 +188,36 @@ def run_ui() -> int:
     logging.info("UI dosyası: %s", INDEX_HTML)
     logging.info("İkon: %s (var=%s)", ICON_PATH, ICON_PATH.is_file())
 
-    # Geçersiz .ico WinForms'ta process'i çökertir; güvenli dene.
-    if ICON_PATH.is_file():
-        try:
-            webview.start(debug=False, icon=str(ICON_PATH))
-        except Exception:
-            logging.exception("İkon ile başlatma başarısız; ikonsuz deneniyor.")
+    # Geçersiz .ico WinForms/CLR'yi öldürür (catch edilemez). Önce ICO imzasını doğrula.
+    icon_arg: str | None = None
+    if ICON_PATH.is_file() and _ico_looks_valid(ICON_PATH):
+        icon_arg = str(ICON_PATH)
+    elif ICON_PATH.is_file():
+        logging.warning("İkon geçersiz görünüyor, ikonsuz başlatılıyor: %s", ICON_PATH)
+
+    try:
+        if icon_arg:
+            webview.start(debug=False, icon=icon_arg)
+        else:
             webview.start(debug=False)
-    else:
+    except Exception:
+        logging.exception("UI başlatma hatası; ikonsuz yeniden deneniyor.")
         webview.start(debug=False)
     return 0
+
+
+def _ico_looks_valid(path: Path) -> bool:
+    """Windows ICONDIR imzası: reserved=0, type=1 (icon), count>0."""
+    try:
+        header = path.read_bytes()[:6]
+    except OSError:
+        return False
+    if len(header) < 6:
+        return False
+    reserved = header[0] | (header[1] << 8)
+    img_type = header[2] | (header[3] << 8)
+    count = header[4] | (header[5] << 8)
+    return reserved == 0 and img_type == 1 and count > 0
 
 
 def main() -> int:

@@ -170,10 +170,18 @@ def _sanitize_prefs(raw: dict[str, Any]) -> dict[str, Any]:
     if stop_longer not in STOP_AFTER_CHOICES:
         stop_longer = "3 days"
 
+    def _safe_time(key: str, fallback: str) -> str:
+        """Bozuk saat değerinde varsayılana düş (UI açılışını çökertmesin)."""
+        try:
+            return _normalize_time(str(raw.get(key, fallback)))
+        except ValueError:
+            logging.warning("Geçersiz saat (%s=%r); varsayılan: %s", key, raw.get(key), fallback)
+            return fallback
+
     return {
         "enabled": bool(raw.get("enabled")),
         "frequency": freq,
-        "time": _normalize_time(str(raw.get("time", "09:00"))),
+        "time": _safe_time("time", "09:00"),
         "start_date": _date("start_date"),
         "sync_timezones": bool(raw.get("sync_timezones")),
         "interval": _int("interval", 1, 365, 1),
@@ -189,7 +197,7 @@ def _sanitize_prefs(raw: dict[str, Any]) -> dict[str, Any]:
         "stop_if_runs_longer": stop_longer,
         "expire_enabled": bool(raw.get("expire_enabled")),
         "expire_date": _date("expire_date"),
-        "expire_time": _normalize_time(str(raw.get("expire_time", "21:00"))),
+        "expire_time": _safe_time("expire_time", "21:00"),
     }
 
 
