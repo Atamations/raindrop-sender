@@ -64,14 +64,16 @@ def _ensure_store() -> None:
 def _read_index() -> dict[str, Any]:
     _ensure_store()
     try:
-        data = json.loads(INDEX_FILE.read_text(encoding="utf-8"))
+        # PowerShell/Windows bazen BOM yazar
+        data = json.loads(INDEX_FILE.read_text(encoding="utf-8-sig"))
         if isinstance(data, dict):
             data.setdefault("active_id", None)
             data.setdefault("order", [])
+            data.setdefault("legacy_migrated", False)
             return data
     except (OSError, json.JSONDecodeError) as exc:
         logging.warning("sessions index okunamadı: %s", exc)
-    return {"active_id": None, "order": []}
+    return {"active_id": None, "order": [], "legacy_migrated": False}
 
 
 def _write_index(data: dict[str, Any]) -> None:
