@@ -9,8 +9,9 @@ import logging
 import smtplib
 import sys
 
-from mailer.config import LOG_FILE, load_config
+from mailer.config import LOG_FILE
 from mailer.send import send_campaign, send_error_report_safe
+from mailer.sessions import build_send_config
 
 
 def setup_logging() -> None:
@@ -27,6 +28,15 @@ def setup_logging() -> None:
     )
 
 
+def _parse_session_arg(argv: list[str]) -> str | None:
+    for i, arg in enumerate(argv):
+        if arg == "--session" and i + 1 < len(argv):
+            return argv[i + 1]
+        if arg.startswith("--session="):
+            return arg.split("=", 1)[1]
+    return None
+
+
 def main() -> int:
     """
     Exit codes:
@@ -35,11 +45,15 @@ def main() -> int:
       2 = beklenmeyen hata
     """
     setup_logging()
-    logging.info("Mail gönderimi başladı.")
+    session_id = _parse_session_arg(sys.argv)
+    logging.info(
+        "Mail gönderimi başladı%s.",
+        f" (session={session_id})" if session_id else "",
+    )
     config = None
 
     try:
-        config = load_config()
+        config = build_send_config(session_id)
         logging.info("Alıcı sayısı: %s", len(config["recipients"]))
         logging.info("Rapor adresi: %s", config["report_email"])
 

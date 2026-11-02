@@ -14,6 +14,7 @@ pyinstaller --noconfirm --clean --windowed --name RaindropMailSender ^
   --hidden-import mailer.send ^
   --hidden-import mailer.schedule ^
   --hidden-import mailer.report ^
+  --hidden-import mailer.sessions ^
   --collect-all clr_loader ^
   --collect-all pythonnet ^
   ui_app.py

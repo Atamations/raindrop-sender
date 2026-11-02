@@ -186,20 +186,73 @@ def config_for_ui() -> dict[str, Any]:
     }
 
 
+def _resolve_password(payload: dict[str, Any]) -> str:
+    """Yeni şifre veya mevcut .env şifresi."""
+    load_dotenv(ENV_FILE, override=True)
+    current_password = os.getenv("GMAIL_APP_PASSWORD", "").replace(" ", "")
+    new_password = str(payload.get("app_password", "")).strip().replace(" ", "")
+    if not new_password or set(new_password) <= {"*"}:
+        return current_password
+    return new_password
+
+
+def save_account(payload: dict[str, Any]) -> dict[str, Any]:
+    """
+    Yalnızca hesap alanlarını .env'e yazar (çoklu oturum modeli).
+    Oturum içerik alanlarını zorlamaz; mevcut RECIPIENT/SUBJECT korunur.
+    """
+    load_dotenv(ENV_FILE, override=True)
+    password_to_store = _resolve_password(payload)
+    gmail = str(payload.get("gmail_address", "")).strip() or os.getenv(
+        "GMAIL_ADDRESS", ""
+    ).strip()
+    report = str(payload.get("report_email", "")).strip() or os.getenv(
+        "REPORT_EMAIL", ""
+    ).strip()
+    smtp_host = (
+        str(payload.get("smtp_host", "")).strip()
+        or os.getenv("SMTP_HOST", "smtp.gmail.com").strip()
+        or "smtp.gmail.com"
+    )
+    smtp_port = (
+        str(payload.get("smtp_port", "")).strip()
+        or os.getenv("SMTP_PORT", "587").strip()
+        or "587"
+    )
+
+    if not gmail:
+        raise ValueError("Gmail adresi gerekli.")
+    if not report:
+        raise ValueError("Hata raporu adresi (REPORT_EMAIL) gerekli.")
+    if not password_to_store:
+        raise ValueError("GMAIL_APP_PASSWORD gerekli (Uygulama Şifresi).")
+
+    parse_single_email(gmail, "GMAIL_ADDRESS")
+    parse_single_email(report, "REPORT_EMAIL")
+
+    values = {
+        "GMAIL_ADDRESS": gmail,
+        "GMAIL_APP_PASSWORD": password_to_store,
+        "RECIPIENT_EMAIL": os.getenv("RECIPIENT_EMAIL", "").strip(),
+        "REPORT_EMAIL": report,
+        "SMTP_HOST": smtp_host,
+        "SMTP_PORT": smtp_port,
+        "EMAIL_SUBJECT": os.getenv("EMAIL_SUBJECT", "").strip(),
+        "EMAIL_BODY": os.getenv("EMAIL_BODY", "").strip(),
+        "ATTACHMENT_PATH": os.getenv("ATTACHMENT_PATH", "").strip(),
+    }
+    _write_env(values)
+    logging.info(".env hesap alanları kaydedildi.")
+    return config_for_ui()
+
+
 def save_config(payload: dict[str, Any]) -> dict[str, Any]:
     """
-    UI'dan gelen alanları .env dosyasına yazar.
+    UI'dan gelen alanları .env dosyasına yazar (tek-oturum / legacy).
 
     app_password boş veya sadece '*' ise mevcut şifre korunur.
     """
-    load_dotenv(ENV_FILE, override=True)
-    current_password = os.getenv("GMAIL_APP_PASSWORD", "").replace(" ", "")
-
-    new_password = str(payload.get("app_password", "")).strip().replace(" ", "")
-    if not new_password or set(new_password) <= {"*"}:
-        password_to_store = current_password
-    else:
-        password_to_store = new_password
+    password_to_store = _resolve_password(payload)
 
     attachments = payload.get("attachment_path", "")
     if isinstance(attachments, list):
@@ -220,7 +273,6 @@ def save_config(payload: dict[str, Any]) -> dict[str, Any]:
         "ATTACHMENT_PATH": attachment_value,
     }
 
-    # Temel doğrulama (şifre hariç zorunlular)
     for key in ("GMAIL_ADDRESS", "RECIPIENT_EMAIL", "REPORT_EMAIL"):
         if not values[key]:
             raise ValueError(f"{key} boş olamaz.")
@@ -231,8 +283,14 @@ def save_config(payload: dict[str, Any]) -> dict[str, Any]:
     parse_single_email(values["REPORT_EMAIL"], "REPORT_EMAIL")
     parse_single_email(values["GMAIL_ADDRESS"], "GMAIL_ADDRESS")
 
+    _write_env(values)
+    logging.info(".env kaydedildi.")
+    return config_for_ui()
+
+
+def _write_env(values: dict[str, str]) -> None:
     lines = [
-        "# Raindrop Mail Sender — otomatik yazıldı (UI / save_config)",
+        "# Raindrop Mail Sender — otomatik yazıldı",
         f"GMAIL_ADDRESS={values['GMAIL_ADDRESS']}",
         f"GMAIL_APP_PASSWORD={values['GMAIL_APP_PASSWORD']}",
         f"RECIPIENT_EMAIL={values['RECIPIENT_EMAIL']}",
@@ -245,8 +303,6 @@ def save_config(payload: dict[str, Any]) -> dict[str, Any]:
         "",
     ]
     ENV_FILE.write_text("\n".join(lines), encoding="utf-8")
-    logging.info(".env kaydedildi.")
-    return config_for_ui()
 
 
 def _escape_env(value: str) -> str:

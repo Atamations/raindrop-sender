@@ -254,15 +254,202 @@ button {
   flex-shrink: 0;
 }
 
-/* Workspace — no overlap */
+/* Workspace — oturumlar | compose | inspector */
 .workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(340px, var(--side-w));
+  grid-template-columns: var(--sessions-w) minmax(0, 1fr) minmax(320px, var(--side-w));
   gap: var(--space-4);
   min-height: 0;
   max-height: 100%;
   overflow: hidden;
   z-index: 1;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+.sessions-rail {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: 100%;
+  border-radius: var(--radius-lg);
+  padding: var(--space-3);
+  overflow: hidden;
+}
+
+.sessions-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  flex-shrink: 0;
+}
+
+.sessions-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-md);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.sessions-sub {
+  margin: 2px 0 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.btn-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--color-text-primary);
+  font-size: 18px;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: background var(--motion-fast) var(--ease-out), border-color var(--motion-fast) var(--ease-out);
+}
+
+.btn-icon:hover {
+  background: rgba(126, 184, 232, 0.2);
+  border-color: rgba(126, 184, 232, 0.45);
+}
+
+.sessions-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.session-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.22);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--motion-fast) var(--ease-out), background var(--motion-fast) var(--ease-out), transform var(--motion-fast) var(--ease-out);
+}
+
+.session-card:hover {
+  border-color: rgba(126, 184, 232, 0.35);
+  background: rgba(126, 184, 232, 0.08);
+}
+
+.session-card.is-active {
+  border-color: rgba(126, 184, 232, 0.55);
+  background: rgba(126, 184, 232, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(126, 184, 232, 0.15);
+}
+
+.session-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.session-card-name {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  line-height: 1.25;
+  word-break: break-word;
+}
+
+.session-badge {
+  flex-shrink: 0;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 3px 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: var(--color-text-muted);
+}
+
+.session-badge.is-on {
+  color: var(--color-success);
+  border-color: rgba(125, 206, 160, 0.4);
+  background: rgba(125, 206, 160, 0.1);
+}
+
+.session-card-meta {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  line-height: 1.35;
+}
+
+.session-card-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.session-card-actions button {
+  flex: 1;
+  font-size: 11px;
+  padding: 5px 6px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--color-text-secondary);
+}
+
+.session-card-actions button:hover {
+  color: var(--color-text-primary);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.session-card-actions .danger:hover {
+  color: var(--color-danger);
+  border-color: rgba(240, 113, 120, 0.45);
+}
+
+.compose-title-row {
+  margin-bottom: var(--space-1);
+}
+
+.session-name-input {
+  width: 100%;
+  border: none;
+  background: transparent;
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  padding: 0;
+  color: var(--color-text-primary);
+}
+
+.session-name-input:focus {
+  outline: none;
+}
+
+.field.is-invalid input,
+.field.is-invalid textarea {
+  border-color: rgba(240, 113, 120, 0.65) !important;
+  box-shadow: 0 0 0 1px rgba(240, 113, 120, 0.25);
 }
 
 .compose {
@@ -776,10 +963,20 @@ button {
   opacity: 0.75;
 }
 
+@media (max-width: 1100px) {
+  .workspace {
+    grid-template-columns: 200px minmax(0, 1fr) minmax(280px, 340px);
+  }
+}
+
 @media (max-width: 980px) {
   .workspace {
     grid-template-columns: 1fr;
-    grid-template-rows: minmax(0, 1fr) minmax(240px, 42%);
+    grid-template-rows: auto minmax(0, 1fr) minmax(220px, 40%);
+  }
+
+  .sessions-rail {
+    max-height: 160px;
   }
 
   .brand-name {

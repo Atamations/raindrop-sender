@@ -62,6 +62,7 @@
   --chrome-h: 64px;
   --action-h: 72px;
   --side-w: 400px;
+  --sessions-w: 240px;
 }
 
 @media (prefers-reduced-motion: reduce) {

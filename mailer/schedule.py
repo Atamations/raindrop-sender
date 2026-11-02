@@ -22,6 +22,17 @@ SCHEDULE_FILE = BASE_DIR / "schedule.json"
 TASK_XML_FILE = BASE_DIR / ".task_raindrop.xml"
 BAT_PATH = BASE_DIR / "run_mailer.bat"
 
+
+def task_name_for_session(session_id: str) -> str:
+    """Windows görev adı (oturum başına benzersiz)."""
+    safe = re.sub(r"[^A-Za-z0-9_-]", "_", str(session_id))[:48]
+    return f"RaindropMail_{safe}"
+
+
+def task_xml_path_for_session(session_id: str) -> Path:
+    safe = re.sub(r"[^A-Za-z0-9_-]", "_", str(session_id))[:48]
+    return BASE_DIR / f".task_{safe}.xml"
+
 WEEKDAY_XML = {
     "mon": "Monday",
     "tue": "Tuesday",
@@ -319,8 +330,13 @@ def _build_calendar_trigger(prefs: dict[str, Any]) -> ET.Element:
     return trigger
 
 
-def build_task_xml(prefs: dict[str, Any]) -> str:
-    """Windows Task Scheduler 1.2 XML üretir."""
+def build_task_xml(
+    prefs: dict[str, Any],
+    *,
+    session_id: str | None = None,
+    session_name: str = "",
+) -> str:
+    """Windows Task Scheduler 1.2 XML üretir (oturum argümanı ile)."""
     if not BAT_PATH.is_file():
         raise FileNotFoundError(f"Çalıştırılacak dosya yok: {BAT_PATH}")
 
@@ -333,10 +349,13 @@ def build_task_xml(prefs: dict[str, Any]) -> str:
         },
     )
 
+    label = session_name.strip() or (session_id or "default")
     reg = ET.SubElement(root, "RegistrationInfo")
     ET.SubElement(reg, "Date").text = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
     ET.SubElement(reg, "Author").text = "Raindrop Mail Sender"
-    ET.SubElement(reg, "Description").text = "Raindrop otomatik e-posta gönderimi"
+    ET.SubElement(reg, "Description").text = (
+        f"Raindrop oturum: {label}" if session_id else "Raindrop otomatik e-posta gönderimi"
+    )
 
     triggers = ET.SubElement(root, "Triggers")
     triggers.append(_build_calendar_trigger(clean))
@@ -368,6 +387,8 @@ def build_task_xml(prefs: dict[str, Any]) -> str:
     actions = ET.SubElement(root, "Actions", {"Context": "Author"})
     exe = ET.SubElement(actions, "Exec")
     ET.SubElement(exe, "Command").text = str(BAT_PATH.resolve())
+    if session_id:
+        ET.SubElement(exe, "Arguments").text = f"--session {session_id}"
     ET.SubElement(exe, "WorkingDirectory").text = str(BASE_DIR.resolve())
 
     rough = ET.tostring(root, encoding="utf-8")
@@ -387,27 +408,37 @@ def _run_schtasks(args: list[str]) -> subprocess.CompletedProcess[str]:
     )
 
 
-def is_task_registered() -> bool:
-    return _run_schtasks(["/Query", "/TN", TASK_NAME]).returncode == 0
+def is_task_registered(task_name: str = TASK_NAME) -> bool:
+    return _run_schtasks(["/Query", "/TN", task_name]).returncode == 0
 
 
-def delete_windows_task() -> None:
-    if not is_task_registered():
+def delete_windows_task(task_name: str = TASK_NAME) -> None:
+    if not is_task_registered(task_name):
         return
-    result = _run_schtasks(["/Delete", "/TN", TASK_NAME, "/F"])
+    result = _run_schtasks(["/Delete", "/TN", task_name, "/F"])
     if result.returncode != 0:
         detail = (result.stderr or result.stdout or "").strip()
         raise RuntimeError(f"Zamanlanmış görev silinemedi: {detail}")
-    logging.info("Windows görevi silindi: %s", TASK_NAME)
+    logging.info("Windows görevi silindi: %s", task_name)
 
 
-def create_windows_task(prefs: dict[str, Any]) -> None:
-    """XML ile Task Scheduler görevi oluşturur/günceller."""
-    xml_text = build_task_xml(prefs)
-    # schtasks UTF-16 (BOM) ister
-    TASK_XML_FILE.write_text(xml_text, encoding="utf-16")
+def create_windows_task(
+    prefs: dict[str, Any],
+    *,
+    session_id: str | None = None,
+    session_name: str = "",
+) -> str:
+    """XML ile Task Scheduler görevi oluşturur/günceller. Görev adını döner."""
+    task_name = task_name_for_session(session_id) if session_id else TASK_NAME
+    xml_path = (
+        task_xml_path_for_session(session_id) if session_id else TASK_XML_FILE
+    )
+    xml_text = build_task_xml(
+        prefs, session_id=session_id, session_name=session_name
+    )
+    xml_path.write_text(xml_text, encoding="utf-16")
     result = _run_schtasks(
-        ["/Create", "/TN", TASK_NAME, "/XML", str(TASK_XML_FILE.resolve()), "/F"]
+        ["/Create", "/TN", task_name, "/XML", str(xml_path.resolve()), "/F"]
     )
     if result.returncode != 0:
         detail = (result.stderr or result.stdout or "").strip()
@@ -415,7 +446,8 @@ def create_windows_task(prefs: dict[str, Any]) -> None:
             "Zamanlanmış görev oluşturulamadı. "
             f"Detay: {detail or 'bilinmeyen hata'}"
         )
-    logging.info("Windows görevi XML ile ayarlandı: %s", TASK_NAME)
+    logging.info("Windows görevi XML ile ayarlandı: %s", task_name)
+    return task_name
 
 
 def _describe(prefs: dict[str, Any]) -> str:
@@ -442,25 +474,25 @@ def _describe(prefs: dict[str, Any]) -> str:
     return " · ".join(parts)
 
 
-def get_schedule_status() -> dict[str, Any]:
-    prefs = load_schedule_prefs()
-    registered = is_task_registered()
-    active = bool(prefs.get("enabled")) and registered
+def _status_from_prefs(prefs: dict[str, Any], task_name: str) -> dict[str, Any]:
+    clean = _sanitize_prefs(prefs)
+    registered = is_task_registered(task_name)
+    active = bool(clean.get("enabled")) and registered
 
     if active:
-        message = f"Aktif — {_describe(prefs)} (PC açıkken)."
-    elif prefs.get("enabled") and not registered:
+        message = f"Aktif — {_describe(clean)} (PC açıkken)."
+    elif clean.get("enabled") and not registered:
         message = "Etkin seçili ama Windows görevi eksik — kaydet."
     else:
         message = "Kapalı — yalnızca elle gönderim."
 
     return {
-        **prefs,
+        **clean,
         "task_registered": registered,
         "active": active,
         "message": message,
-        "task_name": TASK_NAME,
-        "summary": _describe(prefs),
+        "task_name": task_name,
+        "summary": _describe(clean),
         "delay_choices": list(DELAY_CHOICES.keys()),
         "repeat_every_choices": list(REPEAT_EVERY_CHOICES.keys()),
         "repeat_for_choices": list(REPEAT_FOR_CHOICES.keys()),
@@ -468,7 +500,21 @@ def get_schedule_status() -> dict[str, Any]:
     }
 
 
+def get_schedule_status() -> dict[str, Any]:
+    """Eski tek-görev API (geri uyumluluk)."""
+    return _status_from_prefs(load_schedule_prefs(), TASK_NAME)
+
+
+def get_schedule_status_for_session(
+    prefs: dict[str, Any],
+    session_id: str,
+) -> dict[str, Any]:
+    """Oturuma özel zamanlama durumu."""
+    return _status_from_prefs(prefs, task_name_for_session(session_id))
+
+
 def apply_schedule(payload: dict[str, Any]) -> dict[str, Any]:
+    """Eski tek schedule.json yolu."""
     prefs = _sanitize_prefs(payload or {})
     save_schedule_prefs(prefs)
 
@@ -479,4 +525,33 @@ def apply_schedule(payload: dict[str, Any]) -> dict[str, Any]:
 
     status = get_schedule_status()
     logging.info("Zamanlama uygulandı: %s", status["message"])
+    return status
+
+
+def apply_schedule_for_session(
+    payload: dict[str, Any],
+    *,
+    session_id: str,
+    session_name: str = "",
+) -> dict[str, Any]:
+    """
+    Oturum zamanlamasını Windows Task Scheduler'a yazar.
+    schedule.json'a yazmaz — oturum dosyası kaynağıdır.
+    """
+    prefs = _sanitize_prefs(payload or {})
+    task_name = task_name_for_session(session_id)
+
+    if prefs["enabled"]:
+        create_windows_task(
+            prefs, session_id=session_id, session_name=session_name
+        )
+    else:
+        delete_windows_task(task_name)
+
+    status = get_schedule_status_for_session(prefs, session_id)
+    logging.info(
+        "Oturum zamanlaması [%s]: %s",
+        session_id,
+        status["message"],
+    )
     return status

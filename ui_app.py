@@ -2,8 +2,8 @@
 Raindrop Mail Sender — masaüstü UI (pywebview, çerçevesiz pencere).
 
 Kullanım:
-  python ui_app.py          → UI
-  python ui_app.py --send   → tek seferlik CLI gönderim (Task Scheduler)
+  python ui_app.py
+  python ui_app.py --send [--session ID]
 """
 
 from __future__ import annotations
@@ -16,22 +16,26 @@ from typing import Any
 
 import webview
 
-from mailer.config import (
-    BASE_DIR,
-    LOG_FILE,
-    RESOURCE_DIR,
-    config_for_ui,
-    load_config,
-    read_log_tail,
-    save_config,
-)
-from mailer.schedule import apply_schedule, get_schedule_status
+from mailer.config import LOG_FILE, RESOURCE_DIR, read_log_tail
 from mailer.send import send_campaign, send_error_report_safe
+from mailer.sessions import (
+    build_send_config,
+    create_session,
+    delete_session,
+    get_session,
+    list_sessions,
+    rename_session,
+    save_session_payload,
+    set_active_session,
+    set_session_automation,
+)
 
 UI_DIR = RESOURCE_DIR / "ui"
 INDEX_HTML = UI_DIR / "index.html"
 ICON_PATH = RESOURCE_DIR / "assets" / "raindrop.ico"
 if not ICON_PATH.is_file():
+    from mailer.config import BASE_DIR
+
     ICON_PATH = BASE_DIR / "assets" / "raindrop.ico"
 
 
@@ -49,15 +53,27 @@ def setup_logging() -> None:
     )
 
 
-def run_send_once() -> int:
+def _parse_session_arg(argv: list[str]) -> str | None:
+    for i, arg in enumerate(argv):
+        if arg == "--session" and i + 1 < len(argv):
+            return argv[i + 1]
+        if arg.startswith("--session="):
+            return arg.split("=", 1)[1]
+    return None
+
+
+def run_send_once(session_id: str | None = None) -> int:
     """Task Scheduler / --send için CLI gönderim."""
     import smtplib
 
     setup_logging()
-    logging.info("Mail gönderimi başladı (--send).")
+    logging.info(
+        "Mail gönderimi başladı (--send%s).",
+        f" session={session_id}" if session_id else "",
+    )
     config = None
     try:
-        config = load_config()
+        config = build_send_config(session_id)
         result = send_campaign(config)
         logging.info("Özet: %s", result["message"])
         return 0 if result["ok"] else 1
@@ -78,7 +94,7 @@ def run_send_once() -> int:
 
 
 class MailApi:
-    """pywebview JavaScript köprüsü."""
+    """pywebview JavaScript köprüsü — hata fırlatmak yerine {ok:false} döner."""
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
@@ -102,16 +118,66 @@ class MailApi:
         finally:
             self._window = None
 
-    def get_config(self) -> dict[str, Any]:
-        return config_for_ui()
+    def list_sessions(self) -> dict[str, Any]:
+        try:
+            return list_sessions()
+        except Exception as exc:
+            logging.exception("list_sessions")
+            return {"ok": False, "message": str(exc), "sessions": []}
 
-    def save_config(self, payload: dict[str, Any]) -> dict[str, Any]:
+    def get_session(self, session_id: str) -> dict[str, Any]:
+        try:
+            return get_session(str(session_id or ""))
+        except Exception as exc:
+            logging.exception("get_session")
+            return {"ok": False, "message": str(exc)}
+
+    def select_session(self, session_id: str) -> dict[str, Any]:
+        try:
+            return set_active_session(str(session_id or ""))
+        except Exception as exc:
+            logging.exception("select_session")
+            return {"ok": False, "message": str(exc)}
+
+    def create_session(self, name: str = "") -> dict[str, Any]:
         with self._lock:
             try:
-                return save_config(payload or {})
+                return create_session(name or None)
             except Exception as exc:
-                logging.exception("Ayar kaydı başarısız.")
-                raise RuntimeError(str(exc)) from exc
+                logging.exception("create_session")
+                return {"ok": False, "message": str(exc)}
+
+    def delete_session(self, session_id: str) -> dict[str, Any]:
+        with self._lock:
+            try:
+                return delete_session(str(session_id or ""))
+            except Exception as exc:
+                logging.exception("delete_session")
+                return {"ok": False, "message": str(exc)}
+
+    def rename_session(self, session_id: str, name: str) -> dict[str, Any]:
+        with self._lock:
+            try:
+                return rename_session(str(session_id or ""), str(name or ""))
+            except Exception as exc:
+                logging.exception("rename_session")
+                return {"ok": False, "message": str(exc)}
+
+    def set_session_automation(self, session_id: str, enabled: bool) -> dict[str, Any]:
+        with self._lock:
+            try:
+                return set_session_automation(str(session_id or ""), bool(enabled))
+            except Exception as exc:
+                logging.exception("set_session_automation")
+                return {"ok": False, "message": str(exc)}
+
+    def save_session(self, payload: dict[str, Any]) -> dict[str, Any]:
+        with self._lock:
+            try:
+                return save_session_payload(payload or {})
+            except Exception as exc:
+                logging.exception("save_session")
+                return {"ok": False, "message": str(exc)}
 
     def get_log_tail(self) -> str:
         return read_log_tail(100)
@@ -128,23 +194,16 @@ class MailApi:
             return []
         return [str(p) for p in result]
 
-    def get_schedule(self) -> dict[str, Any]:
-        return get_schedule_status()
-
-    def save_schedule(self, payload: dict[str, Any]) -> dict[str, Any]:
-        with self._lock:
-            try:
-                return apply_schedule(payload or {})
-            except Exception as exc:
-                logging.exception("Zamanlama kaydı başarısız.")
-                raise RuntimeError(str(exc)) from exc
-
-    def send_mail(self) -> dict[str, Any]:
+    def send_mail(self, session_id: str = "") -> dict[str, Any]:
+        """Gönderim — asla unhandled raise etmez (UI kilidi önleme)."""
         with self._lock:
             config = None
             try:
-                config = load_config(require_attachments_exist=True)
-                logging.info("UI üzerinden gönderim başladı.")
+                config = build_send_config(session_id or None)
+                logging.info(
+                    "UI gönderim başladı (session=%s).",
+                    config.get("session_id") or "-",
+                )
                 result = send_campaign(config)
                 logging.info("UI gönderim özeti: %s", result["message"])
                 return result
@@ -161,6 +220,20 @@ class MailApi:
                 }
 
 
+def _ico_looks_valid(path: Path) -> bool:
+    """Windows ICONDIR imzası: reserved=0, type=1 (icon), count>0."""
+    try:
+        header = path.read_bytes()[:6]
+    except OSError:
+        return False
+    if len(header) < 6:
+        return False
+    reserved = header[0] | (header[1] << 8)
+    img_type = header[2] | (header[3] << 8)
+    count = header[4] | (header[5] << 8)
+    return reserved == 0 and img_type == 1 and count > 0
+
+
 def run_ui() -> int:
     setup_logging()
 
@@ -173,9 +246,9 @@ def run_ui() -> int:
         title="Raindrop Mail Sender",
         url=Path(INDEX_HTML).as_uri(),
         js_api=api,
-        width=1320,
-        height=900,
-        min_size=(1040, 720),
+        width=1440,
+        height=920,
+        min_size=(1100, 740),
         background_color="#0b1220",
         text_select=True,
         frameless=True,
@@ -188,7 +261,6 @@ def run_ui() -> int:
     logging.info("UI dosyası: %s", INDEX_HTML)
     logging.info("İkon: %s (var=%s)", ICON_PATH, ICON_PATH.is_file())
 
-    # Geçersiz .ico WinForms/CLR'yi öldürür (catch edilemez). Önce ICO imzasını doğrula.
     icon_arg: str | None = None
     if ICON_PATH.is_file() and _ico_looks_valid(ICON_PATH):
         icon_arg = str(ICON_PATH)
@@ -206,23 +278,9 @@ def run_ui() -> int:
     return 0
 
 
-def _ico_looks_valid(path: Path) -> bool:
-    """Windows ICONDIR imzası: reserved=0, type=1 (icon), count>0."""
-    try:
-        header = path.read_bytes()[:6]
-    except OSError:
-        return False
-    if len(header) < 6:
-        return False
-    reserved = header[0] | (header[1] << 8)
-    img_type = header[2] | (header[3] << 8)
-    count = header[4] | (header[5] << 8)
-    return reserved == 0 and img_type == 1 and count > 0
-
-
 def main() -> int:
     if "--send" in sys.argv:
-        return run_send_once()
+        return run_send_once(_parse_session_arg(sys.argv))
     return run_ui()
 
 
