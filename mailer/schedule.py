@@ -64,6 +64,7 @@ DELAY_CHOICES = {
     "8 hours": "PT8H",
 }
 REPEAT_EVERY_CHOICES = {
+    "1 minute": "PT1M",
     "5 minutes": "PT5M",
     "10 minutes": "PT10M",
     "15 minutes": "PT15M",
